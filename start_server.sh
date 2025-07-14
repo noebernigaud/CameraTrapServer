@@ -12,4 +12,4 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Run the server (adjust the command if needed)
-python app.py
+python video_server.py
