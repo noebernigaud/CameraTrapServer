@@ -33,6 +33,22 @@ def upload_video():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"video_{timestamp}.mp4"
     return handle_upload(file, filename)
+    
+@app.route('/upload/mjpeg', methods=['POST'])
+def upload_picture():
+    files = request.files.getlist('picture')
+    if not files:
+        return jsonify({'error': 'No files received'}), 400
+
+    saved_files = []
+    for i, file in enumerate(files):
+        # Use timestamp and index for unique filenames
+        filename = datetime.now().strftime("%Y%m%d_%H%M%S_%f") + f"_{i}.jpg"
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(filepath)
+        saved_files.append(filename)
+
+    return jsonify({'status': 'ok', 'files': saved_files}), 200
 
 # === Picture Upload Route ===
 @app.route("/upload/picture", methods=["POST"])
