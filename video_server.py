@@ -35,7 +35,7 @@ def upload_video():
     return handle_upload(file, filename)
     
 @app.route('/upload/mjpeg', methods=['POST'])
-def upload_picture():
+def upload_picture_stream():
     files = request.files.getlist('picture')
     if not files:
         return jsonify({'error': 'No files received'}), 400
