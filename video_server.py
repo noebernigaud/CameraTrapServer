@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import os
 import requests
 from datetime import datetime
+import re
 
 app = Flask(__name__)
 
@@ -36,18 +37,39 @@ def upload_video():
     
 @app.route('/upload/mjpeg', methods=['POST'])
 def upload_picture_stream():
-    files = request.files.getlist('picture')
-    if not files:
-        return jsonify({'error': 'No files received'}), 400
+    # Get boundary from header
+    content_type = request.headers.get('Content-Type')
+    match = re.search(r'boundary=(.+)', content_type)
+    if not match:
+        return jsonify({'error': 'No boundary found'}), 400
+    boundary = match.group(1)
+    boundary_bytes = ('--' + boundary).encode()
 
+    # Read raw data
+    data = request.get_data()
+    parts = data.split(boundary_bytes)
     saved_files = []
-    for i, file in enumerate(files):
-        # Use timestamp and index for unique filenames
-        filename = datetime.now().strftime("%Y%m%d_%H%M%S_%f") + f"_{i}.jpg"
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filepath)
-        saved_files.append(filename)
-
+    for part in parts:
+        if b'Content-Disposition' in part and b'filename=' in part:
+            # Extract filename
+            filename_match = re.search(b'filename="([^"]+)"', part)
+            if filename_match:
+                filename = filename_match.group(1).decode()
+            else:
+                filename = 'frame.jpg'
+            # Find start of JPEG data
+            header_end = part.find(b'\r\n\r\n')
+            if header_end != -1:
+                img_data = part[header_end+4:]
+                # Remove trailing CRLF and boundary dashes
+                img_data = img_data.rstrip(b'\r\n-')
+                # Save image
+                filepath = os.path.join(UPLOAD_FOLDER, filename)
+                with open(filepath, 'wb') as f:
+                    f.write(img_data)
+                saved_files.append(filename)
+    if not saved_files:
+        return jsonify({'error': 'No files received'}), 400
     return jsonify({'status': 'ok', 'files': saved_files}), 200
 
 # === Picture Upload Route ===

@@ -8,25 +8,32 @@ journalctl -u esp32server -f
 - Create the LXC container, don't forget to give it network access (DHCP)
 - Run the commands:
     - apt update && apt upgrade -y
-    - apt install -y python3 python3-pip git
+    - apt install -y python3 python3-pip python3.12-venv git 
     - mkdir /opt/esp32-video-server
-    - cd mkdir /opt/esp32-video-server
-    - git clone https://github.com/yourname/esp32-video-server.git /opt/esp32-video-server
+    - cd /opt/esp32-video-server
+    - git clone https://github.com/noebernigaud/CameraTrapServer /opt/esp32-video-server
     - python3 -m venv venv
     - nano /etc/systemd/system/esp32server.service
 -> 
 [Unit]
-Description=ESP32 Video Upload Server
+Description=ESP32 Video Python Server
 After=network.target
 
 [Service]
-ExecStart=/opt/esp32-video-server/run.sh
-WorkingDirectory=/opt/esp32-video-server
-Restart=always
+Type=simple
 User=root
+WorkingDirectory=/opt/esp32-video-server
+ExecStart=/bin/bash /opt/esp32-video-server/start_server.sh
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
+<-
+
     - systemctl daemon-reexec
     - systemctl enable esp32server
     - systemctl start esp32server
+
+After this configuration, the server will automaticaly launch on container start with latest code on github.
+Check the log to get the ip adress and change it in the client if needed.
