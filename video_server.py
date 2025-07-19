@@ -34,7 +34,8 @@ def upload_video():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"video_{timestamp}.mp4"
     return handle_upload(file, filename)
-    
+
+# === Chunks of pictures Upload Route ===  
 @app.route('/upload/mjpeg', methods=['POST'])
 def upload_picture_stream():
     # Get boundary from header
@@ -70,6 +71,22 @@ def upload_picture_stream():
                 saved_files.append(filename)
     if not saved_files:
         return jsonify({'error': 'No files received'}), 400
+    return jsonify({'status': 'ok', 'files': saved_files}), 200
+
+# === Multipart request of pictures Upload Route ===
+@app.route('/upload/multipart', methods=['POST'])
+def upload_picture_batch():
+    files = request.files.getlist('picture')
+    if not files:
+        return jsonify({'error': 'No files received'}), 400
+
+    saved_files = []
+    for i, file in enumerate(files):
+        filename = f"frame{i}.jpg"
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(filepath)
+        saved_files.append(filename)
+
     return jsonify({'status': 'ok', 'files': saved_files}), 200
 
 # === Picture Upload Route ===
