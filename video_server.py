@@ -37,10 +37,10 @@ def upload_video():
 
 # === Chunks of pictures Upload Route ===  
 @app.route('/upload/mjpeg', methods=['POST'])
-def upload_picture_stream():
+def upload_mjpeg():
     # Get boundary from header
-    content_type = request.headers.get('Content-Type')
-    match = re.search(r'boundary=(.+)', content_type)
+    content_type = request.headers.get('Content-Type', '')
+    match = re.search(r'boundary=([^\s;]+)', content_type)
     if not match:
         return jsonify({'error': 'No boundary found'}), 400
     boundary = match.group(1)
