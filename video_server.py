@@ -46,32 +46,77 @@ def upload_mjpeg():
     boundary = match.group(1)
     boundary_bytes = ('--' + boundary).encode()
 
+    import cv2
+    import numpy as np
     # Read raw data
     data = request.get_data()
     parts = data.split(boundary_bytes)
     saved_files = []
-    for part in parts:
+    for idx, part in enumerate(parts):
         if b'Content-Disposition' in part and b'filename=' in part:
             # Extract filename
             filename_match = re.search(b'filename="([^"]+)"', part)
             if filename_match:
                 filename = filename_match.group(1).decode()
             else:
-                filename = 'frame.jpg'
+                filename = f'frame{idx}.jpg'
             # Find start of JPEG data
             header_end = part.find(b'\r\n\r\n')
             if header_end != -1:
                 img_data = part[header_end+4:]
-                # Remove trailing CRLF and boundary dashes
                 img_data = img_data.rstrip(b'\r\n-')
-                # Save image
                 filepath = os.path.join(UPLOAD_FOLDER, filename)
                 with open(filepath, 'wb') as f:
                     f.write(img_data)
-                saved_files.append(filename)
+                saved_files.append(filepath)
     if not saved_files:
         return jsonify({'error': 'No files received'}), 400
-    return jsonify({'status': 'ok', 'files': saved_files}), 200
+
+    # Build video from images
+    try:
+        # Read all images and get size
+        frames = [cv2.imread(f) for f in saved_files]
+        frames = [f for f in frames if f is not None]
+        if not frames:
+            # Clean up any files
+            for f in saved_files:
+                if os.path.exists(f):
+                    os.remove(f)
+            return jsonify({'error': 'No valid images'}), 400
+        height, width, layers = frames[0].shape
+        video_filename = f"video_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
+        video_path = os.path.join(UPLOAD_FOLDER, video_filename)
+        out = cv2.VideoWriter(video_path, cv2.VideoWriter_fourcc(*'mp4v'), 5, (width, height))
+        for frame in frames:
+            out.write(frame)
+        out.release()
+
+        # Upload video to Nextcloud
+        with open(video_path, "rb") as f:
+            response = requests.put(
+                NEXTCLOUD_URL + video_filename,
+                data=f,
+                auth=(NEXTCLOUD_USERNAME, NEXTCLOUD_PASSWORD)
+            )
+        # Clean up all files
+        for f in saved_files:
+            if os.path.exists(f):
+                os.remove(f)
+        if os.path.exists(video_path):
+            os.remove(video_path)
+
+        if response.status_code in [200, 201, 204]:
+            return jsonify({"message": "Video uploaded to Nextcloud", "filename": video_filename}), 200
+        else:
+            return jsonify({"error": "Upload to Nextcloud failed", "status": response.status_code}), 500
+    except Exception as e:
+        # Clean up all files
+        for f in saved_files:
+            if os.path.exists(f):
+                os.remove(f)
+        if 'video_path' in locals() and os.path.exists(video_path):
+            os.remove(video_path)
+        return jsonify({"error": "Exception during video creation/upload", "details": str(e)}), 500
 
 # === Multipart request of pictures Upload Route ===
 @app.route('/upload/multipart', methods=['POST'])
